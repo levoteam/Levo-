@@ -4,22 +4,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Code Base
         uses: actions/checkout@v4
 
-      - name: Setup Java Environment
+      - name: Configure Java JDK
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'oracle'
           java-version: '17'
 
-      - name: Fetch Flutter SDK Fast
+      - name: Initialize Flutter Runtime
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: Fresh Project Init & Dynamic Code Injection
+      - name: Direct Workspace Generator
         run: |
           rm -rf ./*
           flutter create --org com.levoteam --project-name levo --platforms=android .
@@ -130,7 +130,6 @@ jobs:
             }
           }
 
-          // --- 🔍 SEARCH LOOP WITH SLIDING OPACITY INDEX ---
           class SearchInterface extends StatefulWidget {
             @override
             State<SearchInterface> createState() => _SearchInterfaceState();
@@ -187,7 +186,6 @@ jobs:
             }
           }
 
-          // --- 💬 MESSAGING HUB WITH MODAL FILTERS & RESTRAINTS ---
           class ChatInterface extends StatelessWidget {
             final VoidCallback onRefreshRequested;
             const ChatInterface({super.key, required this.onRefreshRequested});
@@ -238,7 +236,6 @@ jobs:
             }
           }
 
-          // --- 👤 PROFILE PANEL & INTERACTIVE SCALE GRID ANIMATION ---
           class ProfileInterface extends StatefulWidget {
             final Function(int) onThemeSelect;
             const ProfileInterface({super.key, required this.onThemeSelect});
@@ -334,11 +331,12 @@ jobs:
           }
           EOF
 
-          flutter build apk --release --no-tree-shake-icons
+      - name: Build Arm64 Release APK
+        run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Publish Compiled Artifact
+      - name: Export Output Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: levo-release-package
+          name: levo-standalone-build
           path: build/app/outputs/flutter-apk/app-release.apk
           
