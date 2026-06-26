@@ -15,38 +15,29 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Download and Setup Flutter Direct
-        run: |
-          cd /opt
-          sudo wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.22.2-stable.tar.xz
-          sudo tar xf flutter_linux_3.22.2-stable.tar.xz
-          echo "/opt/flutter/bin" >> $GITHUB_PATH
+      - name: Set up Flutter Fast
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
 
-      - name: Recreate Workspace and Code Injection
+      - name: Create Structure & Code
         run: |
-          export PATH="$PATH:/opt/flutter/bin"
           rm -rf ./*
           flutter create --org com.levoteam --project-name levo_premium_app --platforms=android .
           
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
 
-          void main() {
-            runApp(const LevoApp());
-          }
+          void main() => runApp(const LevoApp());
 
           class LevoApp extends StatelessWidget {
             const LevoApp({super.key});
-
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                title: 'Levo Premium App',
-                theme: ThemeData.dark().copyWith(
-                  scaffoldBackgroundColor: const Color(0xFF000000),
-                  primaryColor: const Color(0xFF00E5FF),
-                ),
+                theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
                 home: const LevoLoginScreen(),
               );
             }
@@ -54,109 +45,61 @@ jobs:
 
           class LevoLoginScreen extends StatefulWidget {
             const LevoLoginScreen({super.key});
+            @override
+            State<LevoLoginScreen> createState() => _LevoLoginScreenState();
+          }
+
+          class _LevoLoginScreenState extends State<LevoLoginScreen> {
+            final _user = TextEditingController();
+            final _pass = TextEditingController();
+            bool _obscure = true;
 
             @override
             Widget build(BuildContext context) {
-              return const Scaffold(
-                backgroundColor: Colors.black,
-                body: LevoLoginBody(),
-              );
-            }
-          }
-
-          class LevoLoginBody extends StatefulWidget {
-            const LevoLoginBody({super.key});
-
-            @override
-            State<LevoLoginBody> createState() => _LevoLoginBodyState();
-          }
-
-          class _LevoLoginBodyState extends State<LevoLoginBody> {
-            final _usernameController = TextEditingController();
-            final _passwordController = TextEditingController();
-            bool _isPasswordObscured = true;
-
-            @override
-            Widget build(BuildContext context) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4), width: 2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'LEVO LOGIN',
-                          style: TextStyle(
-                            color: Color(0xFF00E5FF),
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                        TextField(
-                          controller: _usernameController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            labelText: 'Username or Phone',
-                            labelStyle: TextStyle(color: Colors.white70),
-                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
-                            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: _isPasswordObscured,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
-                            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordObscured ? Icons.visibility_off : Icons.visibility,
-                                color: const Color(0xFF00E5FF),
+              return Scaffold(
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4), width: 2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('LEVO LOGIN', style: TextStyle(color: Color(0xFF00E5FF), fontSize: 26, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 20),
+                          TextField(controller: _user, decoration: const InputDecoration(labelText: 'Username or Phone')),
+                          const SizedBox(height: 15),
+                          TextField(
+                            controller: _pass,
+                            obscureText: _obscure,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF00E5FF)),
+                                onPressed: () => setState(() => _obscure = !_obscure),
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
                               onPressed: () {
-                                setState(() {
-                                  _isPasswordObscured = !_isPasswordObscured;
-                                });
+                                if (_user.text.isNotEmpty) {
+                                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LevoDashboard(username: _user.text)));
+                                }
                               },
+                              child: const Text('CONTINUE', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 40),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00E5FF),
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                            ),
-                            onPressed: () {
-                              if (_usernameController.text.isNotEmpty) {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => LevoDashboard(username: _usernameController.text),
-                                  ),
-                                );
-                              }
-                            },
-                            child: const Text('CONTINUE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -167,7 +110,6 @@ jobs:
           class LevoDashboard extends StatefulWidget {
             final String username;
             const LevoDashboard({super.key, required this.username});
-
             @override
             State<LevoDashboard> createState() => _LevoDashboardState();
           }
@@ -177,22 +119,11 @@ jobs:
               {'user': 'My Story', 'isMe': 'true'},
               {'user': 'alex_99', 'isMe': 'false'},
               {'user': 'sam_rock', 'isMe': 'false'},
-              {'user': 'johndoe', 'isMe': 'false'},
             ];
-
-            void _addNewStory() {
-              setState(() {
-                _stories.insert(1, {'user': 'levo_user_${_stories.length}', 'isMe': 'false'});
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Story Posted Successfully! 🚀')),
-              );
-            }
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                backgroundColor: Colors.black,
                 body: SafeArea(
                   child: SingleChildScrollView(
                     child: Column(
@@ -209,7 +140,6 @@ jobs:
                             ],
                           ),
                         ),
-
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
                           child: Text("Active Rooms & Stories", style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
@@ -225,37 +155,14 @@ jobs:
                                 padding: const EdgeInsets.symmetric(horizontal: 10.0),
                                 child: Column(
                                   children: [
-                                    Stack(
-                                      children: [
-                                        Container(
-                                          width: 60,
-                                          height: 60,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: story['isMe'] == 'true' ? Colors.white38 : const Color(0xFF00E5FF),
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: const CircleAvatar(
-                                            backgroundColor: Colors.white10,
-                                            child: Icon(Icons.person, color: Colors.white, size: 30),
-                                          ),
-                                        ),
-                                        if (story['isMe'] == 'true')
-                                          Positioned(
-                                            bottom: 0,
-                                            right: 0,
-                                            child: GestureDetector(
-                                              onTap: _addNewStory,
-                                              child: const CircleAvatar(
-                                                radius: 9,
-                                                backgroundColor: Color(0xFF00E5FF),
-                                                child: Icon(Icons.add, size: 14, color: Colors.black),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
+                                    Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: story['isMe'] == 'true' ? Colors.white38 : const Color(0xFF00E5FF), width: 2),
+                                      ),
+                                      child: const CircleAvatar(backgroundColor: Colors.white10, child: Icon(Icons.person, color: Colors.white)),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(story['user']!, style: const TextStyle(fontSize: 11, color: Colors.white70)),
@@ -265,24 +172,16 @@ jobs:
                             },
                           ),
                         ),
-
-                        const Divider(color: Colors.white24, thickness: 1),
-
+                        const Divider(color: Colors.white24),
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: InkWell(
                             onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => LevoLiveScreen(username: widget.username)),
-                              );
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => LevoLiveScreen(username: widget.username)));
                             },
                             child: Container(
                               padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                              decoration: BoxDecoration(border: Border.all(color: Colors.redAccent.withOpacity(0.5)), borderRadius: BorderRadius.circular(12)),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -293,28 +192,12 @@ jobs:
                             ),
                           ),
                         ),
-
                         Center(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 20.0),
-                            child: Column(
-                              children: [
-                                const Icon(Icons.play_arrow, size: 40, color: Colors.white30),
-                                Text("Logged User: ${widget.username}", style: const TextStyle(color: Colors.white, fontSize: 14)),
-                              ],
-                            ),
+                            child: Text("Logged User: ${widget.username}", style: const TextStyle(color: Colors.white, fontSize: 14)),
                           ),
                         ),
-
-                        Center(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF3D00)),
-                            onPressed: () {
-                              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LevoLoginScreen()));
-                            },
-                            child: const Text("Logout Session", style: TextStyle(color: Colors.white)),
-                          ),
-                        )
                       ],
                     ),
                   ),
@@ -326,7 +209,6 @@ jobs:
           class LevoLiveScreen extends StatelessWidget {
             final String username;
             const LevoLiveScreen({super.key, required this.username});
-
             @override
             Widget build(BuildContext context) {
               return Scaffold(
@@ -355,12 +237,10 @@ jobs:
           }
           EOF
 
-      - name: Build Production APK
-        run: |
-          export PATH="$PATH:/opt/flutter/bin"
-          flutter build apk --release --no-tree-shake-icons
+      - name: Build Standalone APK
+        run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Export APK File
+      - name: Upload Production Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Levo-Premium-APK
