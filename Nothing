@@ -1,0 +1,125 @@
+name: Build APK
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Build Code
+        run: |
+          rm -rf ./*
+          flutter create --platforms=android .
+          
+          cat << 'EOF' > lib/main.dart
+          import 'package:flutter/material.dart';
+
+          void main() => runApp(MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData.dark(),
+            home: const LevoApp(),
+          ));
+
+          class LevoApp extends StatefulWidget {
+            const LevoApp({super.key});
+            @override
+            State<LevoApp> createState() => _LevoAppState();
+          }
+
+          class _LevoAppState extends State<LevoApp> {
+            bool isLogged = false;
+            final List<String> stories = ['My Story', 'alex_99', 'sam_rock'];
+
+            @override
+            Widget build(BuildContext context) {
+              if (!isLogged) {
+                return Scaffold(
+                  backgroundColor: Colors.black,
+                  body: Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      margin: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFF00E5FF)),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('LEVO LOGIN', style: TextStyle(color: Color(0xFF00E5FF), fontSize: 24, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 20),
+                          const TextField(decoration: InputDecoration(labelText: 'Username')),
+                          const TextField(obscureText: true, decoration: InputDecoration(labelText: 'Password')),
+                          const SizedBox(height: 25),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
+                            onPressed: () => setState(() => isLogged = true),
+                            child: const Text('CONTINUE'),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return Scaffold(
+                backgroundColor: Colors.black,
+                body: SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text("Search Engine & Location Engine Sync Active.", style: TextStyle(color: Colors.greenAccent)),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text("✈ Reel, Photo Post & Live Stream Panel Placeholder", style: TextStyle(color: Colors.white70)),
+                      ),
+                      SizedBox(
+                        height: 90,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: stories.length,
+                          itemBuilder: (context, i) => Padding(
+                            padding: const EdgeInsets.all(10.0),
+                            child: Column(
+                              children: [
+                                const CircleAvatar(backgroundColor: Color(0xFF00E5FF), radius: 20, child: Icon(Icons.person, color: Colors.black)),
+                                Text(stories[i], style: const TextStyle(fontSize: 10))
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      ListTile(
+                        title: const Text("📡 Initialize Live Room", style: TextStyle(color: Colors.redAccent)),
+                        trailing: const Icon(Icons.videocam, color: Colors.redAccent),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => Scaffold(
+                          backgroundColor: Colors.black,
+                          body: Center(child: IconButton(icon: const Icon(Icons.call_end, color: Colors.red, size: 50), onPressed: () => Navigator.pop(context))),
+                        ))),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
+          flutter build apk --release --no-tree-shake-icons
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LevoAPK
+          path: build/app/outputs/flutter-apk/app-release.apk
