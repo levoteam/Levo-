@@ -6,25 +6,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+      - name: Install Java 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk
 
-      - name: Set up Flutter Sahi Wala
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
+      - name: Install Flutter via Snap
+        run: |
+          sudo snap install flutter --classic
+          flutter doctor
 
-      - name: Force Recreate Production Workspace
+      - name: Recreate Levo App Workspace
         run: |
           rm -rf ./*
           flutter create --org com.levoteam --project-name levo_premium_app --platforms=android .
-          
-      - name: Overwrite Main Dart File
+
+      - name: Inject Video Main Code
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -353,10 +353,10 @@ jobs:
           }
           EOF
 
-      - name: Build Standalone APK
+      - name: Compile Release APK
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload Production Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Levo-Premium-APK
