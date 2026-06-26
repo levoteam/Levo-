@@ -4,101 +4,79 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-      - uses: subosito/flutter-action@v2
+
+      - name: Fetch Flutter SDK Fast
+        uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: Compile Application Workspace
+      - name: Clean Build Workspace & Inject Code
         run: |
+          # Purana sab kuch mita kar naya clean space banao
           rm -rf ./*
           flutter create --org com.levoteam --project-name levo --platforms=android .
           
+          # Direct code injection bina kisi error ke
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
 
           void main() => runApp(MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'levo',
-            theme: ThemeData.dark().copyWith(
-              scaffoldBackgroundColor: Colors.black,
-              primaryColor: const Color(0xFF00E5FF),
-            ),
-            home: const LevoAppCore(),
+            theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+            home: const LevoCorePage(),
           ));
 
-          // --- CORE SCHEMAS & DATA STRUCTURE MODELS ---
-          class UserProfile {
-            final String id; String username; String name; String bio; String dob; String region;
-            final String accountCreated; bool isPrivate; bool isPremium; int followers; int following;
-            UserProfile({
-              required this.id, required this.username, required this.name, required this.bio,
-              required this.dob, required this.region, required this.accountCreated,
-              this.isPrivate = false, this.isPremium = false, this.followers = 268, this.following = 140
-            });
+          class UserData {
+            String username = "levo_user";
+            String region = "IN/Asia";
+            String created = "26-06-2026";
+            String dob = "01-01-2000";
+            bool isPremium = true;
           }
 
-          class PostModel {
-            final String id; final String caption; int likes; bool isScaled;
-            PostModel({required this.id, required this.caption, this.likes = 45, this.isScaled = false});
-          }
-
-          // --- APPLICATION ACTIVE NAVIGATION ENGINE ---
-          class LevoAppCore extends StatefulWidget {
-            const LevoAppCore({super.key});
+          class LevoCorePage extends StatefulWidget {
+            const LevoCorePage({super.key});
             @override
-            State<LevoAppCore> createState() => _LevoAppCoreState();
+            State<LevoCorePage> createState() => _LevoCorePageState();
           }
 
-          class _LevoAppCoreState extends State<LevoAppCore> {
-            int _currentTab = 0;
-            bool _isLoading = false;
-            Color _loaderColor = const Color(0xFF00E5FF);
-            final List<Color> _animationColors = [Colors.cyan, Colors.purple, Colors.redAccent, Colors.emeraldAccent];
-            int _colorIndex = 0;
+          class _LevoCorePageState extends State<LevoCorePage> {
+            int _tabIndex = 0;
+            bool _refreshing = false;
+            Color _loadColor = const Color(0xFF00E5FF);
+            final UserData user = UserData();
 
-            final UserProfile currentUser = UserProfile(
-              id: "usr_99", username: "levo_user", name: "Levo Official",
-              bio: "Premium Digital Experience Node.", dob: "01-01-2000",
-              region: "IN/Asia", accountCreated: "26-06-2026", isPremium: true
-            );
-
-            void triggerDynamicRefresh() async {
-              setState(() {
-                _isLoading = true;
-                _colorIndex = (_colorIndex + 1) % _animationColors.length;
-                _loaderColor = _animationColors[_colorIndex];
-              });
-              await Future.delayed(const Duration(milliseconds: 1200));
-              if (mounted) setState(() => _isLoading = false);
+            void runRefresh() async {
+              setState(() => _refreshing = true);
+              await Future.delayed(const Duration(milliseconds: 1000));
+              if (mounted) setState(() => _refreshing = false);
             }
 
             @override
             Widget build(BuildContext context) {
-              final List<Widget> pages = [
-                HomeScreen(onRefresh: triggerDynamicRefresh),
-                SearchScreen(),
-                const ReelsScreen(),
-                ChatScreen(),
-                ProfileScreen(user: currentUser)
+              final List<Widget> bodyTabs = [
+                GestureDetector(onDoubleTap: runRefresh, child: const Center(child: Text("Home Feed (Double Tap to Refresh)"))),
+                const Center(child: Text("Search UI Indexed")),
+                GestureDetector(onDoubleTap: runRefresh, child: const Center(child: Text("🎬 Reels Panel Node Active"))),
+                const Center(child: Text("Chat Rooms Filtered")),
+                ProfileHub(user: user),
               ];
 
               return Scaffold(
                 body: Stack(
                   children: [
-                    pages[_currentTab],
-                    if (_isLoading)
-                      Container(
-                        color: Colors.black54,
-                        child: Center(
-                          child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_loaderColor)),
-                        ),
-                      )
+                    bodyTabs[_tabIndex],
+                    if (_refreshing) Container(color: Colors.black45, child: Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_loadColor)))),
                   ],
                 ),
                 bottomNavigationBar: BottomNavigationBar(
@@ -106,265 +84,69 @@ jobs:
                   backgroundColor: Colors.black,
                   selectedItemColor: const Color(0xFF00E5FF),
                   unselectedItemColor: Colors.white54,
-                  currentIndex: _currentTab,
-                  onTap: (index) {
-                    if (index == _currentTab && (index == 0 || index == 2)) {
-                      triggerDynamicRefresh();
+                  currentIndex: _tabIndex,
+                  onTap: (i) {
+                    if (i == _tabIndex && (i == 0 || i == 2)) {
+                      runRefresh();
                     } else {
-                      setState(() => _currentTab = index);
+                      setState(() => _tabIndex = i);
                     }
                   },
                   items: const [
                     BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
                     BottomNavigationBarItem(icon: Icon(Icons.search), label: ''),
-                    BottomNavigationBarItem(icon: Icon(Icons.movie_creation_outlined), label: ''),
-                    BottomNavigationBarItem(icon: Icon(Icons.messenger_outline), label: ''),
-                    BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
+                    BottomNavigationBarItem(icon: Icon(Icons.movie)),
+                    BottomNavigationBarItem(icon: Icon(Icons.message)),
+                    BottomNavigationBarItem(icon: Icon(Icons.person)),
                   ],
                 ),
               );
             }
           }
 
-          // --- TAB 1: HOME CONTROLLER ---
-          class HomeScreen extends StatelessWidget {
-            final VoidCallback onRefresh;
-            const HomeScreen({super.key, required this.onRefresh});
-
-            @override
-            Widget build(BuildContext context) {
-              return GestureDetector(
-                onDoubleTap: onRefresh,
-                child: Scaffold(
-                  appBar: AppBar(title: const Text('levo', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)), backgroundColor: Colors.black),
-                  body: const Center(child: Text("Home Feed (Double-Tap Screen/Icon to Refresh)", style: TextStyle(color: Colors.white54))),
-                ),
-              );
-            }
-          }
-
-          // --- TAB 2: SEARCH STRIP ANIMATION CONTROLLER ---
-          class SearchScreen extends StatefulWidget {
-            @override
-            State<SearchScreen> createState() => _SearchScreenState();
-          }
-
-          class _SearchScreenState extends State<SearchScreen> {
-            final List<String> _mockAccounts = ["alex_99", "sam_rock", "alpha_levo", "dev_matrix", "shadow_user"];
-            List<String> _suggested = [];
-
-            void _filterIndex(String val) {
-              if (val.isEmpty) {
-                setState(() => _suggested = []);
-                return;
-              }
-              setState(() {
-                _suggested = _mockAccounts.where((element) => element.contains(val.toLowerCase())).toList();
-              });
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                body: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        TextField(
-                          onChanged: _filterIndex,
-                          decoration: InputDecoration(
-                            hintText: "Search account IDs...",
-                            prefixIcon: const Icon(Icons.search, color: Color(0xFF00E5FF)),
-                            filled: true,
-                            fillColor: Colors.white10,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _suggested.length,
-                            itemBuilder: (context, i) {
-                              return AnimatedOpacity(
-                                opacity: 1.0,
-                                duration: const Duration(milliseconds: 400),
-                                child: TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0.3, end: 1.0),
-                                  duration: const Duration(milliseconds: 300),
-                                  builder: (context, val, child) => Opacity(
-                                    opacity: val,
-                                    child: ListTile(
-                                      leading: const CircleAvatar(backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white)),
-                                      title: Text(_suggested[i]),
-                                      trailing: const Text("See All", style: TextStyle(color: Color(0xFF00E5FF), fontSize: 12)),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-          }
-
-          // --- TAB 3: REELS CONTROLLER ---
-          class ReelsScreen extends StatelessWidget {
-            const ReelsScreen({super.key});
-            @override
-            Widget build(BuildContext context) {
-              return const Scaffold(
-                backgroundColor: Colors.black,
-                body: Center(child: Text("🎬 Reels Feed Node Active", style: TextStyle(color: Colors.white70))),
-              );
-            }
-          }
-
-          // --- TAB 4: PRIVATE MESSAGING WITH RESTRAINTS & FILTERS ---
-          class ChatScreen extends StatefulWidget {
-            @override
-            State<ChatScreen> createState() => _ChatScreenState();
-          }
-
-          class _ChatScreenState extends State<ChatScreen> {
-            final List<String> _chats = ["alex_99", "sam_rock"];
-            @override
-            Widget build(BuildContext context) {
-              return DefaultTabController(
-                length: 3,
-                child: Scaffold(
-                  appBar: AppBar(
-                    backgroundColor: Colors.black,
-                    title: const Text("Messages"),
-                    bottom: const TabBar(
-                      indicatorColor: Color(0xFF00E5FF),
-                      tabs: [Tab(text: "Direct"), Tab(text: "Hidden"), Tab(text: "Requests")],
-                    ),
-                  ),
-                  body: TabBarView(
-                    children: [
-                      ListView.builder(
-                        itemCount: _chats.length,
-                        itemBuilder: (context, i) => ListTile(
-                          leading: const CircleAvatar(backgroundColor: Colors.white10),
-                          title: Text(_chats[i]),
-                          subtitle: const Text("Tap & hold options enabled"),
-                          onLongPress: () {
-                            showModalBottomSheet(
-                              context: context,
-                              builder: (context) => Wrap(
-                                children: [
-                                  ListTile(leading: const Icon(Icons.lock), title: const Text('Lock Chat'), onTap: () => Navigator.pop(context)),
-                                  ListTile(leading: const Icon(Icons.hide_source), title: const Text('Hide Chat'), onTap: () => Navigator.pop(context)),
-                                  ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: const Text('Delete for Everyone'), onTap: () => Navigator.pop(context)),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const Center(child: Text("No Hidden Chats")),
-                      const Center(child: Text("No Pending Request Streams")),
-                    ],
-                  ),
-                ),
-              );
-            }
-          }
-
-          // --- TAB 5: PROFILE HUB CONSOLE & SYSTEM DIAGNOSTICS ---
-          class ProfileScreen extends StatefulWidget {
-            final UserProfile user;
-            const ProfileScreen({super.key, required this.user});
-            @override
-            State<ProfileScreen> createState() => _ProfileScreenState();
-          }
-
-          class _ProfileScreenState extends State<ProfileScreen> {
-            final List<PostModel> _posts = [PostModel(id: "1", caption: "Levo Ecosystem Setup"), PostModel(id: "2", caption: "Premium Workspace Interface")];
-
-            void _showReportData() {
-              showModalBottomSheet(
-                context: context,
-                backgroundColor: Colors.grey[950],
-                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-                builder: (context) => Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("⚠️ REPORT ARCHIVE SYSTEM", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 20),
-                      Text("Target Username: ${widget.user.username}", style: const TextStyle(fontSize: 15)),
-                      const SizedBox(height: 10),
-                      Text("Account Region: ${widget.user.region}", style: const TextStyle(fontSize: 15)),
-                      const SizedBox(height: 10),
-                      Text("Initialization Date: ${widget.user.accountCreated}", style: const TextStyle(fontSize: 15)),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              );
-            }
+          class ProfileHub extends StatelessWidget {
+            final UserData user;
+            const ProfileHub({super.key, required this.user});
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(
                   backgroundColor: Colors.black,
-                  title: Text(widget.user.username, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(user.username),
                   actions: [
-                    IconButton(icon: const Icon(Icons.info_outline), onPressed: _showReportData),
-                    IconButton(icon: const Icon(Icons.qr_code), onPressed: () {}),
+                    IconButton(
+                      icon: const Icon(Icons.info_outline),
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: Colors.grey[950],
+                          builder: (c) => Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text("⚠️ ACCOUNT DIAGNOSTICS", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 15),
+                                Text("Username: ${user.username}"),
+                                Text("Region: ${user.region}"),
+                                Text("Created On: ${user.created}"),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    )
                   ],
                 ),
-                body: SingleChildScrollView(
+                body: Center(
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 15),
-                      const CircleAvatar(radius: 45, backgroundColor: Color(0xFF00E5FF), child: Icon(Icons.person, size: 50, color: Colors.black)),
-                      const SizedBox(height: 10),
-                      Text(widget.user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                      Text(widget.user.bio, style: const TextStyle(color: Colors.white54)),
-                      const SizedBox(height: 15),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          OutlinedButton(onPressed: () {}, child: const Text("Edit Profile")),
-                          OutlinedButton(onPressed: () {}, child: const Text("Share Profile")),
-                          OutlinedButton(onPressed: () {}, child: const Text("Copy Link")),
-                        ],
-                      ),
-                      const Divider(height: 30, color: Colors.white24),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _posts.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 5, mainAxisSpacing: 5),
-                        itemBuilder: (context, i) {
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() => _posts[i].isScaled = !_posts[i].isScaled);
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeInOut,
-                              transform: Matrix4.identity()..scale(_posts[i].isScaled ? 1.08 : 1.0),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[900],
-                                border: Border.all(color: _posts[i].isScaled ? const Color(0xFF00E5FF) : Colors.transparent),
-                              ),
-                              child: Center(child: Text(_posts[i].caption, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))),
-                            ),
-                          );
-                        },
-                      )
+                      const CircleAvatar(radius: 40, backgroundColor: Color(0xFF00E5FF), child: Icon(Icons.person, size: 40, color: Colors.black)),
+                      const SizedBox(height: 20),
+                      Text("Premium Status: ${user.isPremium ? 'Active' : 'None'}"),
                     ],
                   ),
                 ),
@@ -373,10 +155,12 @@ jobs:
           }
           EOF
 
+          # Compile Standalone Final Release Package
           flutter build apk --release --no-tree-shake-icons
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish Compiled Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: levo-release-package
+          name: Levo-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           
