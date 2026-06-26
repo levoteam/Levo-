@@ -1,203 +1,210 @@
-name: Android Production Build
-on:
-  push:
-    branches: [ main ]
+name: Build APK
+on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-
-      - name: Set up Flutter Fast
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: Create Structure & Code
+      - name: Compile Application Workspace
         run: |
           rm -rf ./*
-          flutter create --org com.levoteam --project-name levo_premium_app --platforms=android .
+          flutter create --org com.levoteam --project-name levo --platforms=android .
           
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
 
-          void main() => runApp(const LevoApp());
+          void main() => runApp(MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'levo',
+            theme: ThemeData.dark().copyWith(
+              scaffoldBackgroundColor: Colors.black,
+              primaryColor: const Color(0xFF00E5FF),
+            ),
+            home: const LevoAppCore(),
+          ));
 
-          class LevoApp extends StatelessWidget {
-            const LevoApp({super.key});
+          // --- CORE SCHEMAS & DATA STRUCTURE MODELS ---
+          class UserProfile {
+            final String id; String username; String name; String bio; String dob; String region;
+            final String accountCreated; bool isPrivate; bool isPremium; int followers; int following;
+            UserProfile({
+              required this.id, required this.username, required this.name, required this.bio,
+              required this.dob, required this.region, required this.accountCreated,
+              this.isPrivate = false, this.isPremium = false, this.followers = 268, this.following = 140
+            });
+          }
+
+          class PostModel {
+            final String id; final String caption; int likes; bool isScaled;
+            PostModel({required this.id, required this.caption, this.likes = 45, this.isScaled = false});
+          }
+
+          // --- APPLICATION ACTIVE NAVIGATION ENGINE ---
+          class LevoAppCore extends StatefulWidget {
+            const LevoAppCore({super.key});
             @override
-            Widget build(BuildContext context) {
-              return MaterialApp(
-                debugShowCheckedModeBanner: false,
-                theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
-                home: const LevoLoginScreen(),
-              );
+            State<LevoAppCore> createState() => _LevoAppCoreState();
+          }
+
+          class _LevoAppCoreState extends State<LevoAppCore> {
+            int _currentTab = 0;
+            bool _isLoading = false;
+            Color _loaderColor = const Color(0xFF00E5FF);
+            final List<Color> _animationColors = [Colors.cyan, Colors.purple, Colors.redAccent, Colors.emeraldAccent];
+            int _colorIndex = 0;
+
+            final UserProfile currentUser = UserProfile(
+              id: "usr_99", username: "levo_user", name: "Levo Official",
+              bio: "Premium Digital Experience Node.", dob: "01-01-2000",
+              region: "IN/Asia", accountCreated: "26-06-2026", isPremium: true
+            );
+
+            void triggerDynamicRefresh() async {
+              setState(() {
+                _isLoading = true;
+                _colorIndex = (_colorIndex + 1) % _animationColors.length;
+                _loaderColor = _animationColors[_colorIndex];
+              });
+              await Future.delayed(const Duration(milliseconds: 1200));
+              if (mounted) setState(() => _isLoading = false);
             }
-          }
-
-          class LevoLoginScreen extends StatefulWidget {
-            const LevoLoginScreen({super.key});
-            @override
-            State<LevoLoginScreen> createState() => _LevoLoginScreenState();
-          }
-
-          class _LevoLoginScreenState extends State<LevoLoginScreen> {
-            final _user = TextEditingController();
-            final _pass = TextEditingController();
-            bool _obscure = true;
 
             @override
             Widget build(BuildContext context) {
+              final List<Widget> pages = [
+                HomeScreen(onRefresh: triggerDynamicRefresh),
+                SearchScreen(),
+                const ReelsScreen(),
+                ChatScreen(),
+                ProfileScreen(user: currentUser)
+              ];
+
               return Scaffold(
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 30.0),
-                    child: Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4), width: 2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('LEVO LOGIN', style: TextStyle(color: Color(0xFF00E5FF), fontSize: 26, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 20),
-                          TextField(controller: _user, decoration: const InputDecoration(labelText: 'Username or Phone')),
-                          const SizedBox(height: 15),
-                          TextField(
-                            controller: _pass,
-                            obscureText: _obscure,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              suffixIcon: IconButton(
-                                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF00E5FF)),
-                                onPressed: () => setState(() => _obscure = !_obscure),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 30),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
-                              onPressed: () {
-                                if (_user.text.isNotEmpty) {
-                                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LevoDashboard(username: _user.text)));
-                                }
-                              },
-                              child: const Text('CONTINUE', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                body: Stack(
+                  children: [
+                    pages[_currentTab],
+                    if (_isLoading)
+                      Container(
+                        color: Colors.black54,
+                        child: Center(
+                          child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_loaderColor)),
+                        ),
+                      )
+                  ],
+                ),
+                bottomNavigationBar: BottomNavigationBar(
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.black,
+                  selectedItemColor: const Color(0xFF00E5FF),
+                  unselectedItemColor: Colors.white54,
+                  currentIndex: _currentTab,
+                  onTap: (index) {
+                    if (index == _currentTab && (index == 0 || index == 2)) {
+                      triggerDynamicRefresh();
+                    } else {
+                      setState(() => _currentTab = index);
+                    }
+                  },
+                  items: const [
+                    BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
+                    BottomNavigationBarItem(icon: Icon(Icons.search), label: ''),
+                    BottomNavigationBarItem(icon: Icon(Icons.movie_creation_outlined), label: ''),
+                    BottomNavigationBarItem(icon: Icon(Icons.messenger_outline), label: ''),
+                    BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
+                  ],
                 ),
               );
             }
           }
 
-          class LevoDashboard extends StatefulWidget {
-            final String username;
-            const LevoDashboard({super.key, required this.username});
+          // --- TAB 1: HOME CONTROLLER ---
+          class HomeScreen extends StatelessWidget {
+            final VoidCallback onRefresh;
+            const HomeScreen({super.key, required this.onRefresh});
+
             @override
-            State<LevoDashboard> createState() => _LevoDashboardState();
+            Widget build(BuildContext context) {
+              return GestureDetector(
+                onDoubleTap: onRefresh,
+                child: Scaffold(
+                  appBar: AppBar(title: const Text('levo', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)), backgroundColor: Colors.black),
+                  body: const Center(child: Text("Home Feed (Double-Tap Screen/Icon to Refresh)", style: TextStyle(color: Colors.white54))),
+                ),
+              );
+            }
           }
 
-          class _LevoDashboardState extends State<LevoDashboard> {
-            final List<Map<String, String>> _stories = [
-              {'user': 'My Story', 'isMe': 'true'},
-              {'user': 'alex_99', 'isMe': 'false'},
-              {'user': 'sam_rock', 'isMe': 'false'},
-            ];
+          // --- TAB 2: SEARCH STRIP ANIMATION CONTROLLER ---
+          class SearchScreen extends StatefulWidget {
+            @override
+            State<SearchScreen> createState() => _SearchScreenState();
+          }
+
+          class _SearchScreenState extends State<SearchScreen> {
+            final List<String> _mockAccounts = ["alex_99", "sam_rock", "alpha_levo", "dev_matrix", "shadow_user"];
+            List<String> _suggested = [];
+
+            void _filterIndex(String val) {
+              if (val.isEmpty) {
+                setState(() => _suggested = []);
+                return;
+              }
+              setState(() {
+                _suggested = _mockAccounts.where((element) => element.contains(val.toLowerCase())).toList();
+              });
+            }
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
                 body: SafeArea(
-                  child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Search Engine & Location Engine Sync Active.", style: TextStyle(color: Colors.white, fontSize: 14)),
-                              SizedBox(height: 10),
-                              Text("✈ Reel, Photo Post & Live Stream Panel Placeholder", style: TextStyle(color: Colors.white, fontSize: 14)),
-                            ],
+                        TextField(
+                          onChanged: _filterIndex,
+                          decoration: InputDecoration(
+                            hintText: "Search account IDs...",
+                            prefixIcon: const Icon(Icons.search, color: Color(0xFF00E5FF)),
+                            filled: true,
+                            fillColor: Colors.white10,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                           ),
                         ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-                          child: Text("Active Rooms & Stories", style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
-                        ),
-                        SizedBox(
-                          height: 100,
+                        const SizedBox(height: 10),
+                        Expanded(
                           child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _stories.length,
-                            itemBuilder: (context, index) {
-                              final story = _stories[index];
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                                child: Column(
-                                  children: [
-                                    Container(
-                                      width: 60,
-                                      height: 60,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: story['isMe'] == 'true' ? Colors.white38 : const Color(0xFF00E5FF), width: 2),
-                                      ),
-                                      child: const CircleAvatar(backgroundColor: Colors.white10, child: Icon(Icons.person, color: Colors.white)),
+                            itemCount: _suggested.length,
+                            itemBuilder: (context, i) {
+                              return AnimatedOpacity(
+                                opacity: 1.0,
+                                duration: const Duration(milliseconds: 400),
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.3, end: 1.0),
+                                  duration: const Duration(milliseconds: 300),
+                                  builder: (context, val, child) => Opacity(
+                                    opacity: val,
+                                    child: ListTile(
+                                      leading: const CircleAvatar(backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white)),
+                                      title: Text(_suggested[i]),
+                                      trailing: const Text("See All", style: TextStyle(color: Color(0xFF00E5FF), fontSize: 12)),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(story['user']!, style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                                  ],
+                                  ),
                                 ),
                               );
                             },
                           ),
-                        ),
-                        const Divider(color: Colors.white24),
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => LevoLiveScreen(username: widget.username)));
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(border: Border.all(color: Colors.redAccent.withOpacity(0.5)), borderRadius: BorderRadius.circular(12)),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text("📡 Tap to Initialize Live Room", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                                  Icon(Icons.arrow_forward_ios, color: Colors.redAccent, size: 16),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20.0),
-                            child: Text("Logged User: ${widget.username}", style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          ),
-                        ),
+                        )
                       ],
                     ),
                   ),
@@ -206,43 +213,170 @@ jobs:
             }
           }
 
-          class LevoLiveScreen extends StatelessWidget {
-            final String username;
-            const LevoLiveScreen({super.key, required this.username});
+          // --- TAB 3: REELS CONTROLLER ---
+          class ReelsScreen extends StatelessWidget {
+            const ReelsScreen({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return const Scaffold(
+                backgroundColor: Colors.black,
+                body: Center(child: Text("🎬 Reels Feed Node Active", style: TextStyle(color: Colors.white70))),
+              );
+            }
+          }
+
+          // --- TAB 4: PRIVATE MESSAGING WITH RESTRAINTS & FILTERS ---
+          class ChatScreen extends StatefulWidget {
+            @override
+            State<ChatScreen> createState() => _ChatScreenState();
+          }
+
+          class _ChatScreenState extends State<ChatScreen> {
+            final List<String> _chats = ["alex_99", "sam_rock"];
+            @override
+            Widget build(BuildContext context) {
+              return DefaultTabController(
+                length: 3,
+                child: Scaffold(
+                  appBar: AppBar(
+                    backgroundColor: Colors.black,
+                    title: const Text("Messages"),
+                    bottom: const TabBar(
+                      indicatorColor: Color(0xFF00E5FF),
+                      tabs: [Tab(text: "Direct"), Tab(text: "Hidden"), Tab(text: "Requests")],
+                    ),
+                  ),
+                  body: TabBarView(
+                    children: [
+                      ListView.builder(
+                        itemCount: _chats.length,
+                        itemBuilder: (context, i) => ListTile(
+                          leading: const CircleAvatar(backgroundColor: Colors.white10),
+                          title: Text(_chats[i]),
+                          subtitle: const Text("Tap & hold options enabled"),
+                          onLongPress: () {
+                            showModalBottomSheet(
+                              context: context,
+                              builder: (context) => Wrap(
+                                children: [
+                                  ListTile(leading: const Icon(Icons.lock), title: const Text('Lock Chat'), onTap: () => Navigator.pop(context)),
+                                  ListTile(leading: const Icon(Icons.hide_source), title: const Text('Hide Chat'), onTap: () => Navigator.pop(context)),
+                                  ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: const Text('Delete for Everyone'), onTap: () => Navigator.pop(context)),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const Center(child: Text("No Hidden Chats")),
+                      const Center(child: Text("No Pending Request Streams")),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+
+          // --- TAB 5: PROFILE HUB CONSOLE & SYSTEM DIAGNOSTICS ---
+          class ProfileScreen extends StatefulWidget {
+            final UserProfile user;
+            const ProfileScreen({super.key, required this.user});
+            @override
+            State<ProfileScreen> createState() => _ProfileScreenState();
+          }
+
+          class _ProfileScreenState extends State<ProfileScreen> {
+            final List<PostModel> _posts = [PostModel(id: "1", caption: "Levo Ecosystem Setup"), PostModel(id: "2", caption: "Premium Workspace Interface")];
+
+            void _showReportData() {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: Colors.grey[950],
+                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                builder: (context) => Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("⚠️ REPORT ARCHIVE SYSTEM", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 20),
+                      Text("Target Username: ${widget.user.username}", style: const TextStyle(fontSize: 15)),
+                      const SizedBox(height: 10),
+                      Text("Account Region: ${widget.user.region}", style: const TextStyle(fontSize: 15)),
+                      const SizedBox(height: 10),
+                      Text("Initialization Date: ${widget.user.accountCreated}", style: const TextStyle(fontSize: 15)),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              );
+            }
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                body: Stack(
-                  children: [
-                    Container(color: Colors.black, child: const Center(child: Icon(Icons.videocam, size: 100, color: Colors.white12))),
-                    Positioned(
-                      top: 40,
-                      left: 20,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                        child: const Text("LIVE", style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    Positioned(bottom: 50, left: 0, right: 0, child: Center(
-                      child: IconButton(
-                        icon: const CircleAvatar(radius: 30, backgroundColor: Colors.white, child: Icon(Icons.call_end, color: Colors.red)),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ))
+                appBar: AppBar(
+                  backgroundColor: Colors.black,
+                  title: Text(widget.user.username, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  actions: [
+                    IconButton(icon: const Icon(Icons.info_outline), onPressed: _showReportData),
+                    IconButton(icon: const Icon(Icons.qr_code), onPressed: () {}),
                   ],
+                ),
+                body: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 15),
+                      const CircleAvatar(radius: 45, backgroundColor: Color(0xFF00E5FF), child: Icon(Icons.person, size: 50, color: Colors.black)),
+                      const SizedBox(height: 10),
+                      Text(widget.user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text(widget.user.bio, style: const TextStyle(color: Colors.white54)),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          OutlinedButton(onPressed: () {}, child: const Text("Edit Profile")),
+                          OutlinedButton(onPressed: () {}, child: const Text("Share Profile")),
+                          OutlinedButton(onPressed: () {}, child: const Text("Copy Link")),
+                        ],
+                      ),
+                      const Divider(height: 30, color: Colors.white24),
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _posts.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 5, mainAxisSpacing: 5),
+                        itemBuilder: (context, i) {
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() => _posts[i].isScaled = !_posts[i].isScaled);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOut,
+                              transform: Matrix4.identity()..scale(_posts[i].isScaled ? 1.08 : 1.0),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[900],
+                                border: Border.all(color: _posts[i].isScaled ? const Color(0xFF00E5FF) : Colors.transparent),
+                              ),
+                              child: Center(child: Text(_posts[i].caption, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))),
+                            ),
+                          );
+                        },
+                      )
+                    ],
+                  ),
                 ),
               );
             }
           }
           EOF
 
-      - name: Build Standalone APK
-        run: flutter build apk --release --no-tree-shake-icons
+          flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload Production Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: Levo-Premium-APK
+          name: levo-release-package
           path: build/app/outputs/flutter-apk/app-release.apk
           
