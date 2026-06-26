@@ -14,8 +14,8 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Set up Flutter
-        uses: actions/setup-flutter@v3
+      - name: Set up Flutter Sahi Wala
+        uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
